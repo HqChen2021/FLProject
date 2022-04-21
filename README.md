@@ -1,7 +1,7 @@
 # FLProject
 This repository contains code for the FL project. There're several .py files included.
 ## FL_main.py 
-The main function of the model. 
+The main function of the model. Sampling clients to participant in current round, aggregating weights uploaded by clients.
 ## utils.py 
 Download dataset (like MNIST, FMNIST, and CIFAR)
 ## sampling.py 
@@ -12,3 +12,5 @@ For example.
 contains three different models
 ## options.py
 experiment configuration parameters
+## updata.py
+local updating
