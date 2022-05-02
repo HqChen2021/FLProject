@@ -10,6 +10,35 @@ from torch.utils.data import DataLoader
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from models import MLP, CNNMnist, CNNFashion_Mnist, CNNCifar
+import sys
+
+def Initialize_Model(args):
+    if args.model == 'cnn':
+        # Convolutional neural network
+        if args.dataset == 'mnist':
+            global_model = CNNMnist(args=args)
+        elif args.dataset == 'fmnist':
+            global_model = CNNFashion_Mnist(args=args)
+        elif args.dataset == 'cifar':
+            global_model = CNNCifar(args=args)
+
+    elif args.model == 'mlp':
+        # Multi-layer preceptron
+        # TrainSet_per_client[0][0]--client 0, first sample =>(<PIL image>, label)
+        # img_size = TrainSet_per_client[0][0][0].shape
+        img_size = (1, 28, 28)
+        len_in = 1
+        for x in img_size:
+            len_in *= x
+        global_model = MLP(dim_in=len_in, dim_hidden=64,
+                           dim_out=args.num_classes)
+    else:
+        print('Error: unrecognized model')
+        sys.exit(1)
+    return global_model
+
+
 
 def dir_sampling(dataset, num_clients, alpha=0.5):
     """
@@ -79,12 +108,12 @@ def iid_sampling(dataset, num_clients):
     client_data_idx_map, all_index = {}, [i for i in range(len(dataset))]
     for i in range(num_clients):
         # sampling num_items items from dataset, with no repeat
-        client_data_idx_map[i] = set(np.random.choice(all_index, int(num_items),
-                                                      replace=False))
+        selected_idx = np.random.choice(all_index, int(num_items), replace=False)
+        client_data_idx_map[i] = selected_idx
         # a single sampling will not repeat, however second sampling will
         # coincide with the first at probability, so should update the
         # dataset after each sampling
-        all_index = list(set(all_index) - client_data_idx_map[i])
+        all_index = list(set(all_index) - set(selected_idx))
     return client_data_idx_map
 
 
@@ -114,7 +143,7 @@ def get_dataset(args):
         apply_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))])
-        train_set = datasets.MNIST(data_dir, train=True, download=True,transform=apply_transform)
+        train_set = datasets.MNIST(data_dir, train=True, download=True, transform=apply_transform)
         # test_set = datasets.MNIST(data_dir, train=False, download=True,
         #                           transform=apply_transform)
     elif args.dataset == 'fmnist':
@@ -123,7 +152,7 @@ def get_dataset(args):
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))])
         train_dataset = datasets.FashionMNIST(data_dir, train=True, download=True,
-                                       transform=apply_transform)
+                                              transform=apply_transform)
         # test_dataset = datasets.FashionMNIST(data_dir, train=False, download=True,
         #                               transform=apply_transform)
     if args.iid:
@@ -135,9 +164,9 @@ def get_dataset(args):
 
     # Train_set_per_client & Test_set_per_client is a dictionary
     # keys=client index, values = sub-dataset
-    Train_set_per_client,Test_set_per_client = {},{}
+    Train_set_per_client, Test_set_per_client = {}, {}
     for idx in range(args.num_clients):
-        random.shuffle(client_data_idx_map[idx])
+        # random.shuffle(client_data_idx_map[idx])
         length = len(client_data_idx_map[idx])
         Train_set_per_client[idx] = torch.utils.data.Subset(
             train_set, client_data_idx_map[idx][:round(0.8 * length)])
@@ -145,6 +174,7 @@ def get_dataset(args):
             train_set, client_data_idx_map[idx][round(0.8 * length):])
 
     return Train_set_per_client, Test_set_per_client
+
 
 def plot_dis(dict):
     """
@@ -169,6 +199,7 @@ def plot_dis(dict):
                          fmt='.20g', cmap='Greens', ax=ax)
     figure.set(xlabel='class index', ylabel='client index')
     return figure
+
 
 def average_weights(w):
     """
