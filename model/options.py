@@ -11,7 +11,7 @@ def args_parser():
     # federated arguments (Notation for the arguments followed from paper)
     parser.add_argument('--epochs', type=int, default=10,
                         help="number of rounds of training")
-    parser.add_argument('--num_users', type=int, default=10,
+    parser.add_argument('--num_clients', type=int, default=10,
                         help="number of users: K")
     parser.add_argument('--frac', type=float, default=0.3,
                         help='the fraction of clients: C')
@@ -41,6 +41,13 @@ def args_parser():
     parser.add_argument('--max_pool', type=str, default='True',
                         help="Whether use max pooling rather than \
                         strided convolutions")
+    # privacy argument
+    parser.add_argument('--epsilon', type=float, default=50,
+                        help="traget privacy budget")
+    parser.add_argument('--MAX_GRAD_NORM', type=float, default=1.2,
+                        help="max gradient norm of SGD")
+    parser.add_argument('--MAX_PHYSICAL_BATCH_SIZE', type=int, default=32,
+                        help="max physical bathc size")
 
     # other arguments
     parser.add_argument('--dataset', type=str, default='mnist', help="name \
