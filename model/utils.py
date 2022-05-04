@@ -124,11 +124,6 @@ def get_dataset(args):
     the keys are the user index and the values are the corresponding data for
     each of those users.
     """
-    """
-    Apr 29 
-    Now returns two list of list. "Train_set_per_client" and "Test_set_per_client"
-    Train_set_per_client[i] is the training set of client i
-    """
     if args.dataset == 'cifar':
         data_dir = '../data/cifar/'
         apply_transform = transforms.Compose(
@@ -186,7 +181,7 @@ def plot_dis(dict):
     count_matrix = [[] for _ in range(len(dict.keys()))]
     for client_id in dict.keys():
         label = []
-        # this is not working rigth. Access a subset 1. directly through index, 0,1,...,len(subset)
+        # this is not working right. Access a subset 1. directly through index, 0,1,...,len(subset)
         # or 2. subset.dataset[indices]
         # for index in dict[client_id].indices:
         for index in range(len(dict[client_id])):
@@ -198,7 +193,7 @@ def plot_dis(dict):
     figure = sns.heatmap(count_matrix, annot=True, annot_kws={'size': 10},
                          fmt='.20g', cmap='Greens', ax=ax)
     figure.set(xlabel='class index', ylabel='client index')
-    return figure
+    return count_matrix, figure
 
 
 def average_weights(w):
@@ -229,4 +224,8 @@ def exp_details(args):
     print(f'    Fraction of users  : \t{args.frac}')
     print(f'    Local Batch size   : \t{args.local_bs}')
     print(f'    Local Epochs       : \t{args.local_ep}\n')
+
+    print('    DP parameters:')
+    print(f'    Target epsilon  : \t{args.epsilon}')
+    print(f'    MAX_GRAD_NORM  : \t{args.MAX_GRAD_NORM}')
     return

@@ -2,7 +2,6 @@ import os
 
 import copy
 import time
-import pickle
 import numpy as np
 from tqdm import tqdm
 import torch
@@ -13,11 +12,13 @@ from utils import get_dataset, average_weights, exp_details, Initialize_Model, p
 from opacus.validators import ModuleValidator
 from collections import OrderedDict
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 if __name__ == '__main__':
     start_time = time.time()
+    np.random.seed(1)
 
-    # define paths
-    path_project = os.path.abspath('..')
     args = args_parser()
     exp_details(args)
 
@@ -50,13 +51,13 @@ if __name__ == '__main__':
 
     # load dataset and user groups
     TrainSet_per_client, TestSet_per_client = get_dataset(args)
-    # fig = plot_dis(TrainSet_per_client)
-    pass
+    sample_count, _ = plot_dis(TrainSet_per_client)
+
     # instantiate client objects
     client_lst = []
     for idx in range(args.num_clients):
         client_lst.append(client(idx, args, train_set=TrainSet_per_client[idx],
-                             test_set=TestSet_per_client[idx]))
+                                 test_set=TestSet_per_client[idx]))
 
     for epoch in tqdm(range(args.epochs)):
         # print(f'\n | Global Training Round : {epoch + 1} |\n')
@@ -66,27 +67,20 @@ if __name__ == '__main__':
         # FL training
         local_weights, local_losses, local_acc = [], [], []
         for idx in selected_clients:
-            """
-            w, loss, acc = client_lst[idx].update_model(global_round=epoch, 
-                                                    privacy_budget=args.epsilon)
-            use this code, update_model get model from the previous round will incur 
-            "Trying to add hooks twice to the same model" error. Each round
-            """
+            # 
+            # w, loss, acc = client_lst[idx].update_model(global_round=epoch, 
+            #                                         privacy_budget=args.epsilon)
+            # use this code, update_model get model from the previous round will incur 
+            # "Trying to add hooks twice to the same model" error. Each round
+            # 
             w, loss, acc = client_lst[idx].update_model(global_round=epoch,
-                                                    model_weights=global_weights,
-                                                    privacy_budget=args.epsilon)
+                                                        model_weights=global_weights,
+                                                        privacy_budget=args.epsilon)
             local_weights.append(copy.deepcopy(w))
             local_losses.append(copy.deepcopy(loss))
             local_acc.append(copy.deepcopy(acc))
         # update global weights
         global_weights = average_weights(local_weights)
-
-        # replace the '_module' prefix of global_weights'
-        # new_global_weights = OrderedDict()
-        # for k,v in global_weights.items():
-        #     name = k[8:]
-        #     new_global_weights[name] = v
-        # global_model.load_state_dict(new_global_weights)
 
         # calculate average loss
         loss_avg = sum(local_losses) / len(local_losses)
@@ -105,9 +99,9 @@ if __name__ == '__main__':
         if (epoch + 1) % print_every == 0:
             print(f' \nAvg Training Stats after {epoch + 1} global rounds:')
             print(f'Training Loss : {np.mean(np.array(train_loss))}')
-            print('Train Accuracy: {:.2f}% \n'.format(100 * train_accuracy[-1]))
-            print(f'accuracy of each client: {list_acc}')
-            
+            print('Train Accuracy: {:.2f}% '.format(100 * train_accuracy[-1]))
+            print(f'accuracy of each client: {list_acc}\n')
+
     # Test inference after completion of training
     # test_acc, test_loss = test_inference(args, global_model, TestSet_per_client)
     test_acc = np.mean([client_lst[i].acc for i in range(args.num_clients)])
@@ -118,14 +112,17 @@ if __name__ == '__main__':
     print("|---- Test Accuracy: {:.2f}%".format(test_acc * 100))
     print('\n Total Run Time: {0:0.4f}'.format(time.time() - start_time))
 
-    save_path = './save'
+    save_path = '..\save'
     if not os.path.exists(save_path):
         os.mkdir(save_path)
-    file_name = os.path.join(save_path, '{}_{}_{}_C[{}]_iid[{}]_E[{}]_B[{}].pkl'. \
-                             format(args.dataset, args.model, args.epochs, args.frac, 
-                                    args.iid, args.local_ep, args.local_bs))
-    with open(file_name, 'wb') as f:
-        pickle.dump([train_loss, train_accuracy], f)
+    save_path = os.path.join(save_path, '{}_{}_C[{}]_F[{}]_iid[{}]_E[{}]_B[{}]_Epsilon[{}].pkl'.
+                             format(args.dataset, args.model, args.num_clients, args.frac,
+                                    args.iid, args.local_ep, args.local_bs, args.epsilon))
 
+    state = {
+        'state_dict': global_weights,  # 保存模型参数
+        'client_lst': client_lst,
+        'sample_count': sample_count
+    }
+    torch.save(state, save_path)
     # plot data distribution via heatmap
-    # fig = plot_dis(TrainSet_per_client)

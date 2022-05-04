@@ -65,6 +65,7 @@ class client(object):
         )
         # Set mode to train model
         model.train()
+        model.to(self.device)
         with BatchMemoryManager(data_loader=train_loader,
                                 max_physical_batch_size=self.args.MAX_PHYSICAL_BATCH_SIZE,
                                 optimizer=optimizer) as memory_safe_data_loader:
@@ -76,7 +77,7 @@ class client(object):
                     images, target = images.to(self.device), target.to(self.device)
                     # model.zero_grad() the same as optimizer.zero_grad()
                     # calculate batch loss
-                    output = model(images)
+                    output = model(images).to(self.device)
                     loss = self.criterion(output, target)
                     batch_loss.append(loss.item())
                     # calculate batch accuracy
@@ -104,6 +105,7 @@ class client(object):
         model = self.load_weights(model, model_weights)
         # model.load_state_dict(model_weights)
         model.eval()
+        model.to(self.device)
         batch_acc, batch_loss = [], []
         for batch_idx, (images, target) in enumerate(self.test_loader):
             images, target = images.to(self.device), target.to(self.device)
