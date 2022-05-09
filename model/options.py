@@ -25,7 +25,7 @@ def args_parser():
                         help='SGD momentum (default: 0.5)')
 
     # model arguments
-    parser.add_argument('--model', type=str, default='mlp', help='model name')
+    parser.add_argument('--model', type=str, default='cnn', help='model name')
     parser.add_argument('--kernel_num', type=int, default=9,
                         help='number of each kind of kernel')
     parser.add_argument('--kernel_sizes', type=str, default='3,4,5',
@@ -42,12 +42,16 @@ def args_parser():
                         help="Whether use max pooling rather than \
                         strided convolutions")
     # privacy argument
-    parser.add_argument('--epsilon', type=float, default=50,
-                        help="traget privacy budget")
-    parser.add_argument('--MAX_GRAD_NORM', type=float, default=1.2,
+    parser.add_argument('--is_dp', type=int, default=0,
+                        help="indicate whether DP is added")
+    parser.add_argument('--epsilon', type=float, default=0.1,
+                        help="target privacy budget")
+    parser.add_argument('--max_grad_norm', type=float, default=1.2,
                         help="max gradient norm of SGD")
-    parser.add_argument('--MAX_PHYSICAL_BATCH_SIZE', type=int, default=256,
+    parser.add_argument('--max_physical_batch_size', type=int, default=256,
                         help="max physical batch size")
+    parser.add_argument('--noise_multiplier', type=float, default=1.2,
+                        help="noise multiplier")
 
     # other arguments
     parser.add_argument('--dataset', type=str, default='mnist', help="name \
@@ -68,6 +72,9 @@ def args_parser():
     parser.add_argument('--stopping_rounds', type=int, default=10,
                         help='rounds of early stopping')
     parser.add_argument('--verbose', type=int, default=160, help='verbose')
-    parser.add_argument('--seed', type=int, default=1, help='random seed')
-    args = parser.parse_args()
+    parser.add_argument('--logdir', type=str, default='../logs/', help='log directory path')
+    parser.add_argument('--log_file_name', type=str, default=None, help='log file name')
+    # args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
     return args
+

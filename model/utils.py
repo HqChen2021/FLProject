@@ -10,16 +10,16 @@ from torch.utils.data import DataLoader
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from models import MLP, CNNMnist, CNNFashion_Mnist, CNNCifar
+from models import MLP, CNN, CNN, CNNCifar
 import sys
 
 def Initialize_Model(args):
     if args.model == 'cnn':
         # Convolutional neural network
         if args.dataset == 'mnist':
-            global_model = CNNMnist(args=args)
+            global_model = CNN(args=args)
         elif args.dataset == 'fmnist':
-            global_model = CNNFashion_Mnist(args=args)
+            global_model = CNN(args=args)
         elif args.dataset == 'cifar':
             global_model = CNNCifar(args=args)
 
@@ -31,7 +31,7 @@ def Initialize_Model(args):
         len_in = 1
         for x in img_size:
             len_in *= x
-        global_model = MLP(dim_in=len_in, dim_hidden=64,
+        global_model = MLP(dim_in=len_in, dim_hidden=500,
                            dim_out=args.num_classes)
     else:
         print('Error: unrecognized model')
@@ -40,7 +40,7 @@ def Initialize_Model(args):
 
 
 
-def dir_sampling(dataset, num_clients, alpha=0.5):
+def dir_sampling(train_set,test_set, num_clients, alpha=0.5):
     """
     dirichlet_distribution_sampling
     input:  dataset, num_clients, alpha
@@ -57,45 +57,50 @@ def dir_sampling(dataset, num_clients, alpha=0.5):
     min_size = 0
     # if dataset = ConcatDataset(MNIST_Train, MNIST_Test)
     # then num_classes = len(dataset.datasets[0].classes)
-    num_classes = len(dataset.classes)
-    num_all_data = len(dataset)  # dataset.shape = 60000,28,28 for FMNIST
+    num_classes = len(train_set.classes)
+    num_all_data = len(train_set)  # dataset.shape = 60000,28,28 for FMNIST
     client_data_idx_map = {}
-    least_samples = 10
+    least_samples = 50
     while min_size < least_samples:
-        data_index = [[] for _ in range(num_clients)]
+        train_data_index = [[] for _ in range(num_clients)]
+        test_data_index = [[] for _ in range(num_clients)]
         # data_index is a list stores data_index (which is also a list)
         # for clients. initialized as empty and increases step by step
         # equivalent to a sub-dataset
         for k in range(num_classes):
-            idx_of_class_k = np.where(dataset.targets == k)[0]
+            train_idx_of_class_k = np.where(train_set.targets == k)[0]
+            test_idx_of_class_k = np.where(test_set.targets == k)[0]
             # locate index belong to data from class k
-            np.random.shuffle(idx_of_class_k)
+            np.random.shuffle(train_idx_of_class_k)
+            np.random.shuffle(test_idx_of_class_k)
             # introduce randomness?
             proportions = np.random.dirichlet(np.repeat(alpha, num_clients))
             # generate sampling probabilities, [p_1,p_2,...p_K] \sum_{i=1}^{K}(p_i)=1
             proportions = np.array([p * (len(idx_j) < num_all_data / num_clients)
-                                    for p, idx_j in zip(proportions, data_index)])
+                                    for p, idx_j in zip(proportions, train_data_index)])
             # check the probabilities list, if client j has gain enough samples,
             # then his sampling probability is set to 0 for this round and afterward
             proportions = proportions / proportions.sum()
             # resize the prob list
-            proportions = (np.cumsum(proportions) * len(idx_of_class_k)).astype(int)[:-1]
-            # calculate the cumulative sum of proba list, rule out the last element(which
-            # i think is unnecessary)
-            data_index = [idx_j + idx.tolist() for idx_j, idx in
-                          zip(data_index, np.split(idx_of_class_k, proportions))]
+            train_proportions = (np.cumsum(proportions) * len(train_idx_of_class_k)).astype(int)[:-1]
+            test_proportions = (np.cumsum(proportions) * len(test_idx_of_class_k)).astype(int)[:-1]
+            # calculate the cumulative sum of proba list, rule out the last element
+            train_data_index = [idx_j + idx.tolist() for idx_j, idx in
+                          zip(train_data_index, np.split(train_idx_of_class_k, train_proportions))]
+            test_data_index = [idx_j + idx.tolist() for idx_j, idx in
+                                zip(test_data_index, np.split(test_idx_of_class_k, test_proportions))]
             # update data_index, distribute samples from class k accorss all clients
-        min_size = min([len(idx_j) for idx_j in data_index])
+        min_size = min([len(idx_j) for idx_j in train_data_index])
         # calulate min_size to see whether need to re-sampling
 
     for j in range(num_clients):
-        np.random.shuffle(data_index[j])
-        client_data_idx_map[j] = data_index[j]
+        np.random.shuffle(train_data_index[j])
+        client_data_idx_map[j] = [train_data_index[j], test_data_index[j]]
 
     return client_data_idx_map
 
 
-def iid_sampling(dataset, num_clients):
+def iid_sampling(train_set, test_set, num_clients):
     """
     IID sampling
     input: dataset, num_clients
@@ -103,71 +108,73 @@ def iid_sampling(dataset, num_clients):
     param:
     dataset--training dataset
     """
-    num_items = int(len(dataset) / num_clients)
+    train_per_clients = int(len(train_set) / num_clients)
+    test_per_clients = int(len(test_set) / num_clients)
     # dividing dataset into num_clients parts equally
-    client_data_idx_map, all_index = {}, [i for i in range(len(dataset))]
+    client_data_idx_map = {}
+    train_all_index, test_all_index = [i for i in range(len(train_set))], \
+                                      [i for i in range(len(test_set))]
     for i in range(num_clients):
         # sampling num_items items from dataset, with no repeat
-        selected_idx = np.random.choice(all_index, int(num_items), replace=False)
-        client_data_idx_map[i] = selected_idx
+        train_data_index = np.random.choice(train_all_index, int(train_per_clients), replace=False)
+        test_data_index = np.random.choice(test_all_index, int(test_per_clients), replace=False)
+        client_data_idx_map[i] = [train_data_index[i], test_data_index[i]]
         # a single sampling will not repeat, however second sampling will
         # coincide with the first at probability, so should update the
         # dataset after each sampling
-        all_index = list(set(all_index) - set(selected_idx))
+        train_all_index = list(set(train_all_index) - set(train_data_index))
+        test_all_index = list(set(test_all_index) - set(test_data_index))
     return client_data_idx_map
 
 
 # fig = plot_dis(Train_set_per_client)
 
 def get_dataset(args):
-    """ Returns train and test datasets and a user group which is a dict where
-    the keys are the user index and the values are the corresponding data for
-    each of those users.
+    """
+    returns two list of list. "Train_set_per_client" and "Test_set_per_client"
+    Train_set_per_client[i] is the training set of client i
     """
     if args.dataset == 'cifar':
-        data_dir = '../data/cifar/'
+        data_dir = './data/cifar/'
         apply_transform = transforms.Compose(
             [transforms.ToTensor(),
              transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
         train_set = datasets.CIFAR10(data_dir, train=True, download=True,
                                      transform=apply_transform)
-        # test_set = datasets.CIFAR10(data_dir, train=False, download=True,
-        #                             transform=apply_transform)
+        test_set = datasets.CIFAR10(data_dir, train=False, download=True,
+                                    transform=apply_transform)
     elif args.dataset == 'mnist':
         data_dir = './data/mnist/'
         apply_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))])
         train_set = datasets.MNIST(data_dir, train=True, download=True, transform=apply_transform)
-        # test_set = datasets.MNIST(data_dir, train=False, download=True,
-        #                           transform=apply_transform)
+        test_set = datasets.MNIST(data_dir, train=False, download=True,
+                                  transform=apply_transform)
     elif args.dataset == 'fmnist':
         data_dir = './data/fmnist/'
         apply_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))])
-        train_dataset = datasets.FashionMNIST(data_dir, train=True, download=True,
+        train_set = datasets.FashionMNIST(data_dir, train=True, download=True,
                                               transform=apply_transform)
-        # test_dataset = datasets.FashionMNIST(data_dir, train=False, download=True,
-        #                               transform=apply_transform)
+        test_set = datasets.FashionMNIST(data_dir, train=False, download=True,
+                                      transform=apply_transform)
     if args.iid:
         # client_data_idx_map is a dictionary
         # keys=client index, values = list of sample index
-        client_data_idx_map = iid_sampling(train_set, args.num_clients)
+        client_data_idx_map = iid_sampling(train_set, test_set, args.num_clients)
     else:
-        client_data_idx_map = dir_sampling(train_set, args.num_clients, args.alpha)
+        client_data_idx_map = dir_sampling(train_set, test_set, args.num_clients, args.alpha)
 
     # Train_set_per_client & Test_set_per_client is a dictionary
     # keys=client index, values = sub-dataset
     Train_set_per_client, Test_set_per_client = {}, {}
     for idx in range(args.num_clients):
-        # random.shuffle(client_data_idx_map[idx])
-        length = len(client_data_idx_map[idx])
         Train_set_per_client[idx] = torch.utils.data.Subset(
-            train_set, client_data_idx_map[idx][:round(0.8 * length)])
+            train_set, client_data_idx_map[idx][0])
         Test_set_per_client[idx] = torch.utils.data.Subset(
-            train_set, client_data_idx_map[idx][round(0.8 * length):])
-
+            test_set, client_data_idx_map[idx][1])
     return Train_set_per_client, Test_set_per_client
 
 
@@ -193,7 +200,8 @@ def plot_dis(dict):
     figure = sns.heatmap(count_matrix, annot=True, annot_kws={'size': 10},
                          fmt='.20g', cmap='Greens', ax=ax)
     figure.set(xlabel='class index', ylabel='client index')
-    return count_matrix, figure
+    plt.show(block=True)
+    return count_matrix
 
 
 def average_weights(w):
@@ -214,7 +222,6 @@ def exp_details(args):
     print(f'    Optimizer : {args.optimizer}')
     print(f'    Learning  : {args.lr}')
     print(f'    Global Rounds   : {args.epochs}\n')
-
     print('    Federated parameters:')
     if args.iid:
         print('    IID')
@@ -226,6 +233,9 @@ def exp_details(args):
     print(f'    Local Epochs       : \t{args.local_ep}\n')
 
     print('    DP parameters:')
+    print(f'    DP mechanism is running') if args.is_dp else print(f'    No DP mechanism is running')
     print(f'    Target epsilon  : \t{args.epsilon}')
-    print(f'    MAX_GRAD_NORM  : \t{args.MAX_GRAD_NORM}')
+    print(f'    Noise_multiplier:\t{args.noise_multiplier}')
+    print(f'    max_grad_norm  : \t{args.max_grad_norm}')
     return
+
