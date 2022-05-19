@@ -1,28 +1,25 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# Python version: 3.6
-
 import argparse
 
 
 def args_parser():
     parser = argparse.ArgumentParser()
-
     # federated arguments (Notation for the arguments followed from paper)
     parser.add_argument('--epochs', type=int, default=10,
                         help="number of rounds of training")
     parser.add_argument('--num_clients', type=int, default=10,
                         help="number of users: K")
-    parser.add_argument('--frac', type=float, default=0.3,
+    parser.add_argument('--frac', type=float, default=0.2,
                         help='the fraction of clients: C')
-    parser.add_argument('--local_ep', type=int, default=5,
+    parser.add_argument('--local_ep', type=int, default=1,
                         help="the number of local epochs: E")
-    parser.add_argument('--local_bs', type=int, default=512,
+    parser.add_argument('--local_bs', type=int, default=64,
                         help="local batch size: B")
     parser.add_argument('--lr', type=float, default=0.01,
                         help='learning rate')
     parser.add_argument('--momentum', type=float, default=0.5,
                         help='SGD momentum (default: 0.5)')
+    parser.add_argument('--use_local_best', type=int, default=0,
+                        help='indicator to use local best model')
 
     # model arguments
     parser.add_argument('--model', type=str, default='cnn', help='model name')
@@ -42,17 +39,25 @@ def args_parser():
                         help="Whether use max pooling rather than \
                         strided convolutions")
     # privacy argument
-    parser.add_argument('--is_dp', type=int, default=0,
+    parser.add_argument('--is_dp', type=int, default=1,
                         help="indicate whether DP is added")
     parser.add_argument('--epsilon', type=float, default=0.1,
                         help="target privacy budget")
     parser.add_argument('--max_grad_norm', type=float, default=1.2,
                         help="max gradient norm of SGD")
-    parser.add_argument('--max_physical_batch_size', type=int, default=256,
+    parser.add_argument('--max_physical_batch_size', type=int, default=128,
                         help="max physical batch size")
-    parser.add_argument('--noise_multiplier', type=float, default=1.2,
+    parser.add_argument('--noise_multiplier', type=float, default=5,
                         help="noise multiplier")
-
+    parser.add_argument('--min_z', type=float, default=0.5,
+                        help="minimum noise multiplier")
+    #game part
+    parser.add_argument('--se_game', type=int, default=1,
+                        help="indicator of SE game")
+    parser.add_argument('--target_acc', type=float, default=0.9,
+                        help="target accuracy")
+    parser.add_argument('--start_time', type=float, default=0.1,
+                        help="start_time")
     # other arguments
     parser.add_argument('--dataset', type=str, default='mnist', help="name \
                         of dataset")
@@ -77,4 +82,3 @@ def args_parser():
     # args = parser.parse_args()
     args, unknown = parser.parse_known_args()
     return args
-

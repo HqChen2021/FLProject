@@ -8,26 +8,20 @@ def dir_sampling(dataset, num_clients, alpha=0.5):
     """
     dirichlet_distribution_sampling
     input: dataset, num_clients, alpha
-    return: dirichlet distributed samples stored in a dictionary,
-            keys = client id, values = sample index
+    return: dirichlet distributed samples stored in a dictionary, keys = client id, values = sample index
     param:
-    dataset--training dataset, i.e., data = datasets.FashionMNIST(root='data/FMNIST',
-                                                                  download=True,train=True)
-    alpha--controls the dirichlet distribution, is a list of the same
-          length as #classes, could be equal or unequal,
-          i.e., alpha = [1,1,1,1] or [1,1,100,1] for class=4,
-          the later will heavily concentrate distribution on class 3
+    dataset--training dataset, i.e., data = datasets.FashionMNIST(root='data/FMNIST',download=True,train=True)
+    alpha--controls the dirichlet distribution, is a list of the same length as #classes, could be equal or unequal,
+           i.e., alpha = [1,1,1,1] or [1,1,100,1] for class=4, the later will heavily concentrate distribution on class 3
     """
     min_size = 0
     num_classes = len(dataset.classes)
     num_all_data = dataset.data.shape[0] # dataset.shape = 60000,28,28 for FMNIST
-    client_data_idx_map = {}
+    client_dataidx_map = {}
     least_samples = 10
     while min_size < least_samples:
         data_index = [[] for _ in range(num_clients)]
-        # data_index is a list stores data_index (which is also a list)
-        # for clients. initialized as empty and increases step by step
-        # equivalent to a sub-dataset
+        # data_index is a list stores data_index for clients. initialized as empty and increases step by step
         for k in range(num_classes):
             idx_of_class_k = np.where(dataset.targets == k)[0]
             # locate index belong to data from class k
@@ -35,26 +29,25 @@ def dir_sampling(dataset, num_clients, alpha=0.5):
             # introduce randomness?
             proportions = np.random.dirichlet(np.repeat(alpha, num_clients))
             # generate sampling probabilities, [p_1,p_2,...p_K] \sum_{i=1}^{K}(p_i)=1
-            proportions = np.array([p * (len(idx_j) < num_all_data / num_clients)
-                                    for p, idx_j in zip(proportions, data_index)])
-            # check the probabilities list, if client j has gain enough samples,
-            # then his sampling probability is set to 0 for this round and afterward
+            proportions = np.array([p * (len(idx_j) < num_all_data / num_clients) for p, idx_j in zip(proportions,
+                                                                                                      data_index)])
+            # check the probabilities lsit, if client j has gain enough samples,
+            # tthen his sampling probability is set to 0 for this round and afterward
             proportions = proportions / proportions.sum()
             # resize the prob list
             proportions = (np.cumsum(proportions) * len(idx_of_class_k)).astype(int)[:-1]
-            # calculate the cumulative sum of proba list, rule out the last element(which
-            # i think is unnecessary)
-            data_index = [idx_j + idx.tolist() for idx_j, idx in
-                          zip(data_index, np.split(idx_of_class_k, proportions))]
+            # calculate the cumulative sum of proba list, rule out the last element(which i think is unnecessary)
+            data_index = [idx_j + idx.tolist() for idx_j, idx in zip(data_index, np.split(idx_of_class_k, proportions))]
             # update data_index, distribute samples from class k accorss all clients
         min_size = min([len(idx_j) for idx_j in data_index])
         # calulate min_size to see whether need to re-sampling
 
     for j in range(num_clients):
         np.random.shuffle(data_index[j])
-        client_data_idx_map[j] = data_index[j]
+        client_dataidx_map[j] = data_index[j]
 
-    return client_data_idx_map
+    return client_dataidx_map
+
 
 def iid_sampling(dataset, num_clients):
     """
@@ -66,30 +59,30 @@ def iid_sampling(dataset, num_clients):
     """
     num_items = int(len(dataset) / num_clients)
     # NOTE dividing dataset into num_users parts equally
-    client_data_idx_map, all_index = {}, [i for i in range(len(dataset) )]
+    client_dataidx_map, all_index = {}, [i for i in range(len(dataset) )]
     for i in range(num_clients):
-        client_data_idx_map[i] = set(np.random.choice(all_index, int(num_items),
+        client_dataidx_map[i] = set(np.random.choice(all_index, int(num_items),
                                                      replace=False))
         # sampling num_items items from dataset, with no repeat
-        all_index = list(set(all_index) - client_data_idx_map[i])
+        all_index = list(set(all_index) - client_dataidx_map[i])
         # a single sampling will not repeat, however second sampling will
         # coincide with the first at probability, so should update the
         # dataset after each sampling
-    return client_data_idx_map
+    return client_dataidx_map
 
-# fig = plot_dis(Train_set_per_client)
-def plot_dis(dataset, client_data_idx_map):
+
+def plot_dis(dataset, client_dataidx_map):
     """
     param:
     dataset
-    client_data_idx_map: a dictionary, keys: client id, value: sample indices
+    client_dataidx_map: a dictionary, keys: client id, value: sample indices
     return: a heatmap figure plot by seaborn
     """
-    num_clients = len(Train_set_per_client.keys())
+    num_clients = len(client_dataidx_map.keys())
     num_classes = len(dataset.classes)
     labels = [[] for _ in range(num_clients)]
     for i in range(10):
-        for index in client_data_idx_map[i]:
+        for index in client_dataidx_map[i]:
             _, lable = dataset[index]
             labels[i].append(lable)
 
@@ -112,16 +105,16 @@ def plot_dis(dataset, client_data_idx_map):
 #     """
 #     num_items = int(len(dataset) / num_users)
 #     # NOTE dividing dataset into num_users parts equally
-#     client_data_idx_map, all_index = {}, [i for i in range(len(dataset))]
+#     client_dataidx_map, all_index = {}, [i for i in range(len(dataset))]
 #     for i in range(num_users):
-#         client_data_idx_map[i] = set(np.random.choice(all_index, int(num_items),
+#         client_dataidx_map[i] = set(np.random.choice(all_index, int(num_items),
 #                                              replace=False))
 #         # sampling num_items items from dataset, with no repeat
-#         all_index = list(set(all_index) - client_data_idx_map[i])
+#         all_index = list(set(all_index) - client_dataidx_map[i])
 #         # a single sampling will not repeat, however second sampling will
 #         # coincide with the first at probability, so should update the
 #         # dataset after each sampling
-#     return client_data_idx_map
+#     return client_dataidx_map
 #
 # def mnist_noniid(dataset, num_users):
 #     """
@@ -132,7 +125,7 @@ def plot_dis(dataset, client_data_idx_map):
 #     # 60,000 training imgs -->  200 imgs/shard X 300 shards
 #     num_shards, num_imgs = 200, 300
 #     idx_shard = [i for i in range(num_shards)]
-#     client_data_idx_map = {i: np.array([]) for i in range(num_users)}
+#     client_dataidx_map = {i: np.array([]) for i in range(num_users)}
 #     idxs = np.arange(num_shards * num_imgs)
 #     # np.arange(3,7,2) --> array([3, 5])
 #     labels = dataset.train_labels.numpy()
@@ -153,9 +146,9 @@ def plot_dis(dataset, client_data_idx_map):
 #         rand_set = set(np.random.choice(idx_shard, 2, replace=False))
 #         idx_shard = list(set(idx_shard) - rand_set)
 #         for rand in rand_set:
-#             client_data_idx_map[i] = np.concatenate(
-#                 (client_data_idx_map[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]), axis=0)
-#     return client_data_idx_map
+#             client_dataidx_map[i] = np.concatenate(
+#                 (client_dataidx_map[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]), axis=0)
+#     return client_dataidx_map
 #
 # def mnist_noniid_unequal(dataset, num_users):
 #     """
@@ -169,7 +162,7 @@ def plot_dis(dataset, client_data_idx_map):
 #     # 60,000 training imgs --> 50 imgs/shard X 1200 shards
 #     num_shards, num_imgs = 1200, 50
 #     idx_shard = [i for i in range(num_shards)]
-#     client_data_idx_map = {i: np.array([]) for i in range(num_users)}
+#     client_dataidx_map = {i: np.array([]) for i in range(num_users)}
 #     idxs = np.arange(num_shards * num_imgs)
 #     labels = dataset.train_labels.numpy()
 #
@@ -199,8 +192,8 @@ def plot_dis(dataset, client_data_idx_map):
 #             rand_set = set(np.random.choice(idx_shard, 1, replace=False))
 #             idx_shard = list(set(idx_shard) - rand_set)
 #             for rand in rand_set:
-#                 client_data_idx_map[i] = np.concatenate(
-#                     (client_data_idx_map[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]),
+#                 client_dataidx_map[i] = np.concatenate(
+#                     (client_dataidx_map[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]),
 #                     axis=0)
 #
 #         random_shard_size = random_shard_size - 1
@@ -216,8 +209,8 @@ def plot_dis(dataset, client_data_idx_map):
 #                                             replace=False))
 #             idx_shard = list(set(idx_shard) - rand_set)
 #             for rand in rand_set:
-#                 client_data_idx_map[i] = np.concatenate(
-#                     (client_data_idx_map[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]),
+#                 client_dataidx_map[i] = np.concatenate(
+#                     (client_dataidx_map[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]),
 #                     axis=0)
 #     else:
 #
@@ -227,24 +220,24 @@ def plot_dis(dataset, client_data_idx_map):
 #                                             replace=False))
 #             idx_shard = list(set(idx_shard) - rand_set)
 #             for rand in rand_set:
-#                 client_data_idx_map[i] = np.concatenate(
-#                     (client_data_idx_map[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]),
+#                 client_dataidx_map[i] = np.concatenate(
+#                     (client_dataidx_map[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]),
 #                     axis=0)
 #
 #         if len(idx_shard) > 0:
 #             # Add the leftover shards to the client with minimum images:
 #             shard_size = len(idx_shard)
 #             # Add the remaining shard to the client with lowest data
-#             k = min(client_data_idx_map, key=lambda x: len(client_data_idx_map.get(x)))
+#             k = min(client_dataidx_map, key=lambda x: len(client_dataidx_map.get(x)))
 #             rand_set = set(np.random.choice(idx_shard, shard_size,
 #                                             replace=False))
 #             idx_shard = list(set(idx_shard) - rand_set)
 #             for rand in rand_set:
-#                 client_data_idx_map[k] = np.concatenate(
-#                     (client_data_idx_map[k], idxs[rand * num_imgs:(rand + 1) * num_imgs]),
+#                 client_dataidx_map[k] = np.concatenate(
+#                     (client_dataidx_map[k], idxs[rand * num_imgs:(rand + 1) * num_imgs]),
 #                     axis=0)
 #
-#     return client_data_idx_map
+#     return client_dataidx_map
 #
 # def cifar_iid(dataset, num_users):
 #     """
@@ -254,12 +247,12 @@ def plot_dis(dataset, client_data_idx_map):
 #     :return: dict of image index
 #     """
 #     num_items = int(len(dataset) / num_users)
-#     client_data_idx_map, all_idxs = {}, [i for i in range(len(dataset))]
+#     client_dataidx_map, all_idxs = {}, [i for i in range(len(dataset))]
 #     for i in range(num_users):
-#         client_data_idx_map[i] = set(np.random.choice(all_idxs, num_items,
+#         client_dataidx_map[i] = set(np.random.choice(all_idxs, num_items,
 #                                              replace=False))
-#         all_idxs = list(set(all_idxs) - client_data_idx_map[i])
-#     return client_data_idx_map
+#         all_idxs = list(set(all_idxs) - client_dataidx_map[i])
+#     return client_dataidx_map
 #
 #
 # def cifar_noniid(dataset, num_users):
@@ -271,7 +264,7 @@ def plot_dis(dataset, client_data_idx_map):
 #     """
 #     num_shards, num_imgs = 200, 250
 #     idx_shard = [i for i in range(num_shards)]
-#     client_data_idx_map = {i: np.array([]) for i in range(num_users)}
+#     client_dataidx_map = {i: np.array([]) for i in range(num_users)}
 #     idxs = np.arange(num_shards * num_imgs)
 #     # labels = dataset.train_labels.numpy()
 #     labels = np.array(dataset.train_labels)
@@ -286,9 +279,9 @@ def plot_dis(dataset, client_data_idx_map):
 #         rand_set = set(np.random.choice(idx_shard, 2, replace=False))
 #         idx_shard = list(set(idx_shard) - rand_set)
 #         for rand in rand_set:
-#             client_data_idx_map[i] = np.concatenate(
-#                 (client_data_idx_map[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]), axis=0)
-#     return client_data_idx_map
+#             client_dataidx_map[i] = np.concatenate(
+#                 (client_dataidx_map[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]), axis=0)
+#     return client_dataidx_map
 
 
 if __name__ == '__main__':
