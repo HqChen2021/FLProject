@@ -10,6 +10,22 @@ from utils import get_dataset, average_weights, exp_details, Initialize_Model, p
 from opacus.validators import ModuleValidator
 from opacus import GradSampleModule
 
+""" 我跑的时候的设置
+--num_clients=10
+--epoch=150
+--iid=0
+--local_bs=128
+--local_ep=3
+--min_z=0.69314
+--noise_multiplier=0.69314
+--max_grad_norm=1.2
+--dataset=fmnist
+--se_game=0
+--is_dp=1
+--target_acc=0.8
+--use_local_best=0
+--lr=0.01
+"""
 if __name__ == '__main__':
     np.random.seed(1)
     args = args_parser()
